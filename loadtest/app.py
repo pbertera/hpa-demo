@@ -2,9 +2,12 @@
 from flask import Flask, request, jsonify, make_response
 import requests
 from multiprocessing import Pool
-from multiprocessing import cpu_count
+
 from threading import Thread, current_thread
 import time
+import psutil
+import os
+import signal
 
 application = Flask(__name__)
 
@@ -28,30 +31,44 @@ def memory(size, seconds):
     thread = Thread(target=allocate_memory, args=(size,seconds))
     thread.daemon = True
     thread.start()
-    return make_response("Started memory thread {}".format(thread.name), 200)
+    return make_response(jsonify(message="Allocated {} Megabytes for {} seconds".format(size, seconds)), 200)
 
-def f(x):
-    loop_count = 1000 * 1024 * 250
-    while loop_count > 0:
+def allocate_cpu(x, seconds):
+    pid = psutil.Process().pid
+    start = time.time()
+    print('{} - Started using 1 CPU core for {} seconds'.format(pid, seconds))
+    while True:
+      now = time.time()
+      if (now - start) > seconds:
+        break
       x*x
-      loop_count = loop_count - 1
+    print('{} - Done, freeing 1 core'.format(pid))
 
-@application.route('/api/loadtest/v1/cpu/<int:cpus>')
-def cpu(cpus):
+@application.route('/api/loadtest/v1/cpu/<int:cpus>/<int:seconds>')
+def cpu(cpus, seconds):
 
-    print('Number of cpus available: %d' % cpu_count())
-    if (cpus > cpu_count()):
-        return make_response("Requested cpus > number of cores available.", 400)
+    if (cpus > psutil.cpu_count()):
+        return make_response(jsonify(error="Requested cpus > number of cores available."), 400)
 
-    print('-' * 20)
-    print('Running load on CPU(s)')
     print('Utilizing %d cores' % cpus)
-    print('-' * 20)
-    pool = Pool(cpus)
-    pool.map(f, range(cpus))
-    pool.close()
+    pool = Pool(processes=cpus)
+    for c in range(cpus):
+        pool.apply_async(allocate_cpu, (c, seconds,))
+    return make_response(jsonify(message="Allocated {} cores for {} seconds".format(cpus, seconds)), 200)
 
-    return make_response("", 200)
+
+@application.route('/api/loadtest/v1/stats')
+def stats():
+    stats = {'processes': []}
+    p = psutil.Process()
+    proc_cpu = p.cpu_percent(interval=0.1)
+    proc_mem = p.memory_info().rss / 1024 / 1024
+    stats['processes'].append({'pid': p.pid,'cpu': proc_cpu, 'mem': proc_mem})
+    for children in p.children():
+        proc_cpu = children.cpu_percent(interval=0.1)
+        proc_mem = children.memory_info().rss / 1024 /1024
+        stats['processes'].append({'pid': children.pid, 'cpu': proc_cpu, 'mem': proc_mem})
+    return make_response(jsonify(stats), 200)
 
 if __name__ == '__main__':
      application.run(host='0.0.0.0',port=8080)
