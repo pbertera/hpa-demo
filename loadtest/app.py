@@ -59,7 +59,7 @@ def cpu(cpus, seconds):
 
 @application.route('/api/loadtest/v1/stats')
 def stats():
-    stats = {'processes': []}
+    stats = {'processes': [], 'cores': psutil.cpu_count()}
     p = psutil.Process()
     proc_cpu = p.cpu_percent(interval=0.1)
     proc_mem = p.memory_info().rss / 1024 / 1024
