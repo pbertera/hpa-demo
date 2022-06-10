@@ -2,12 +2,10 @@
 from flask import Flask, request, jsonify, make_response
 import requests
 from multiprocessing import Pool
-
 from threading import Thread, current_thread
 import time
 import psutil
 import os
-import signal
 
 application = Flask(__name__)
 
@@ -71,4 +69,10 @@ def stats():
     return make_response(jsonify(stats), 200)
 
 if __name__ == '__main__':
-     application.run(host='0.0.0.0',port=8080)
+    start_cpu_peak_seconds = int(os.environ.get('START_CPU_PEAK_SEC', 0))
+    start_cpu_peak_cores = int(os.environ.get('START_CPU_PEAK_CORES', 1))
+    if start_cpu_peak_seconds > 0:
+        pool = Pool(processes=start_cpu_peak_cores)
+        for c in range(start_cpu_peak_cores):
+            pool.apply_async(allocate_cpu, (c, start_cpu_peak_seconds,))
+    application.run(host='0.0.0.0',port=8080)
