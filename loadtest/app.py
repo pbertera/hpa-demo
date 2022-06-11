@@ -44,7 +44,6 @@ def allocate_cpu(x, seconds):
 
 @application.route('/api/loadtest/v1/cpu/<int:cpus>/<int:seconds>')
 def cpu(cpus, seconds):
-
     if (cpus > psutil.cpu_count()):
         return make_response(jsonify(error="Requested cpus > number of cores available."), 400)
 
@@ -53,7 +52,6 @@ def cpu(cpus, seconds):
     for c in range(cpus):
         pool.apply_async(allocate_cpu, (c, seconds,))
     return make_response(jsonify(message="Allocated {} cores for {} seconds".format(cpus, seconds)), 200)
-
 
 @application.route('/api/loadtest/v1/stats')
 def stats():
