@@ -17,6 +17,114 @@ The application exposes the following API:
 
 ## Examples
 
+- Start the loadtest app
+
+```
+$ oc new-app --name loadtest https://github.com/pbertera/hpa-demo/ --context-dir loadtest
+```
+
+- Check the build logs
+
+```
+$ oc logs bc/loadtest -f
+```
+
+- Once the build is completed, create the route
+
+```
+$ oc expose svc loadtest
+```
+
+- Test the application:
+
+```
+$ oc get pods
+$ ROUTE_URL="http://$(oc get route loadtest -o jsonpath='{.spec.host}')"
+```
+
+- Health check:
+
+```
+$ curl -s ${ROUTE_URL}/api/loadtest/v1/healthz
+{"health":"ok"}
+```
+
+- Check the stats
+
+```
+$ curl -s $ROUTE_URL/api/loadtest/v1/stats | jq
+{
+  "cores": 4,
+  "hostname": "loadtest-5c6b969b4d-jh98n",
+  "processes": [
+    {
+      "cpu": 0,
+      "mem": 30.7421875,
+      "pid": 1
+    }
+  ]
+}
+```
+
+- Start 3 processes allocating 1 core of CPU for 60 seconds
+
+```
+$ curl -s $ROUTE_URL/api/loadtest/v1/cpu/3/60 | jq
+{
+  "message": "Allocated 3 cores for 60 seconds"
+}
+
+$ curl -s $ROUTE_URL/api/loadtest/v1/stats | jq
+{
+  "cores": 4,
+  "hostname": "loadtest-5c6b969b4d-jh98n",
+  "processes": [
+    {
+      "cpu": 0,
+      "mem": 31.31640625,
+      "pid": 1
+    },
+    {
+      "cpu": 95.8,
+      "mem": 24.6796875,
+      "pid": 29
+    },
+    {
+      "cpu": 97.8,
+      "mem": 24.6796875,
+      "pid": 30
+    },
+    {
+      "cpu": 89.7,
+      "mem": 24.6796875,
+      "pid": 31
+    }
+  ]
+}
+```
+
+- Allocate 500MB of memory for 60 seconds
+
+```
+$ curl -s $ROUTE_URL/api/loadtest/v1/mem/500/60 | jq
+{
+  "message": "Allocated 500 Megabytes for 60 seconds"
+}
+
+$ curl -s $ROUTE_URL/api/loadtest/v1/stats | jq
+{
+  "cores": 4,
+  "hostname": "loadtest-5c6b969b4d-jh98n",
+  "processes": [
+    {
+      "cpu": 0,
+      "mem": 531.3515625,
+      "pid": 1
+    }
+  ]
+}
+```
+
 ## Script demo 1
 
 * Hands on on the HPA
