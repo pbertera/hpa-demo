@@ -125,6 +125,34 @@ $ curl -s $ROUTE_URL/api/loadtest/v1/stats | jq
 }
 ```
 
+- Simulate 30 seconds startup spike of 2 CPU core:
+
+```
+$ oc set env deploy/loadtest START_CPU_PEAK_SEC=30 START_CPU_PEAK_CORES=2
+$ curl -s $ROUTE_URL/api/loadtest/v1/stats | jq
+{
+  "cores": 4,
+  "hostname": "loadtest-6755bcc8d9-xwrxj",
+  "processes": [
+    {
+      "cpu": 0,
+      "mem": 30.6875,
+      "pid": 1
+    },
+    {
+      "cpu": 69.6,
+      "mem": 24.39453125,
+      "pid": 19
+    },
+    {
+      "cpu": 89.5,
+      "mem": 24.40625,
+      "pid": 20
+    }
+  ]
+}
+```
+
 ## Script demo 1
 
 * Hands on on the HPA
@@ -166,7 +194,7 @@ curl ${ROUTE_URL}/api/loadtest/v1/healthz
 Set the resources on the application
 
 ```
-oc set resources deployment loadtest --requests cpu=25m,memory=25Mi --limits cpu=100m,memory=100Mi
+oc set resources deployment loadtest --requests cpu=250m,memory=25Mi --limits cpu=1000m,memory=100Mi
 ```
 
 Configure the HPA
@@ -198,7 +226,16 @@ Let the application scale-up and scale-down
 *On the main terminal:* remove the CPU resource requests
 
 ```
-oc set resources deployment loadtest --requests cpu=0,memory=25Mi --limits cpu=100m,memory=100Mi
+oc edit deployment loadtest
+
+[...]
+        resources:
+          limits:
+            cpu: "1"
+            memory: 100Mi
+          requests:
+            memory: 25Mi
+[...]
 ```
 
 Keep the relevant resources monitored
@@ -248,7 +285,7 @@ Let the application scale-up and scale-down
 
 * Scale on memory
 
-*On the main terminal:* change the threshold type to `AverageValue`
+*On the main terminal:* change the resource type to `memory`
 
 ```
 oc edit hpa loadtest
@@ -263,10 +300,10 @@ oc edit hpa loadtest
 ...
 ```
 
-Set the resources on the application
+Set the limit resources on the application to avoid OOM-Kill
 
 ```
-oc set resources deployment loadtest --requests cpu=25m,memory=250Mi --limits cpu=100m,memory=1000Mi
+oc set resources deployment loadtest --requests cpu=250m,memory=200Mi --limits cpu=1000m,memory=1000M
 ```
 
 Keep the relevant resources monitored
@@ -275,7 +312,7 @@ Keep the relevant resources monitored
 watch oc get hpa,podmetrics,pods
 ```
 
-*On a different terminal:* create meory load
+*On a different terminal:* create meory load allocating 500MB for 2 minutes
 
 ```
 curl $ROUTE_URL/api/loadtest/v1/mem/500/120
@@ -302,14 +339,22 @@ oc edit hpa loadtest
 ...
 ```
 
-Set the resources on the application
+Set the resources on the application to request 1/4 of CPU core
 
 ```
-oc set resources deployment loadtest --requests cpu=25m,memory=250Mi --limits cpu=1,memory=1000Mi
+oc set resources deployment loadtest --requests cpu=250m,memory=200Mi --limits cpu=1,memory=1000Mi
 ```
 
 Configure the application to generate a CPU peak using 1 core for 5 minutes
 
 ```
 oc set env deploy/loadtest START_CPU_PEAK_SEC=300 START_CPU_PEAK_CORES=1
+```
+
+## Cleanup
+
+Remove the loadtest namespace
+
+```
+oc delete loadtest
 ```
