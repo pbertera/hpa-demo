@@ -203,6 +203,18 @@ Configure the HPA
 oc autoscale deployment/loadtest --min 2 --max 10 --cpu-percent 50
 ```
 
+Reduce the `stabilizationWindowSeconds` to speed-up the scaledown
+
+```
+oc edit hpa loadtest
+[...]
+spec:
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 0
+[...]
+```
+
 Keep the relevant resources monitored
 
 ```
@@ -262,7 +274,7 @@ oc edit hpa loadtest
   - resource:
       name: cpu
       target:
-        averageValue: 50
+        averageValue: 100m
         type: AverageValue
 ...
 ```
@@ -312,10 +324,10 @@ Keep the relevant resources monitored
 watch oc get hpa,podmetrics,pods
 ```
 
-*On a different terminal:* create meory load allocating 500MB for 2 minutes
+*On a different terminal:* create meory load allocating 500MB for 4 minutes
 
 ```
-curl $ROUTE_URL/api/loadtest/v1/mem/500/120
+curl -s $ROUTE_URL/api/loadtest/v1/mem/500/240
 ```
 
 Let the application scale-up and scale-down
@@ -356,5 +368,5 @@ oc set env deploy/loadtest START_CPU_PEAK_SEC=300 START_CPU_PEAK_CORES=1
 Remove the loadtest namespace
 
 ```
-oc delete loadtest
+oc delete hpa-demo
 ```
